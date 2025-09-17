@@ -1,0 +1,14 @@
+{
+  "name": "magi-ui",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "google-auth-library": "^9.15.1",
+    "morgan": "^1.10.0"
+  }
+}
