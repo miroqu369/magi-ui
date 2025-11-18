@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const {GoogleAuth} = require('google-auth-library');
 const app = express();
-
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -33,6 +32,36 @@ app.post('/api/query', async (req, res) => {
     res.json(response.data);
   } catch (error) {
     console.error('Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stock Analysis エンドポイント
+app.post('/api/stock-analysis', async (req, res) => {
+  const { ticker, prompt } = req.body;
+  
+  if (!ticker) {
+    return res.status(400).json({ error: 'ticker required' });
+  }
+  
+  try {
+    const magiAppUrl = 'https://magi-app-398890937507.asia-northeast1.run.app';
+    const auth = new GoogleAuth();
+    const client = await auth.getIdTokenClient(magiAppUrl);
+    
+    // magi-app の stock-ai-analysis エンドポイントを呼び出し
+    const response = await client.request({
+      url: `${magiAppUrl}/api/stock/ai-analysis/${ticker}`,
+      method: 'POST',
+      data: { 
+        prompt: prompt || `${ticker}の株価分析`,
+        meta: { temperature: 0.2 }
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    console.error('Stock Analysis Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
