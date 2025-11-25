@@ -7,123 +7,231 @@ function App() {
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const handleAnalyze = async (symbol) => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol })
-      });
-      const data = await res.json();
-      setResults(prev => ({ ...prev, [symbol]: data }));
-    } catch (err) {
-      setResults(prev => ({ ...prev, [symbol]: { error: err.message } }));
-    }
-    setLoading(false);
-  };
-
-  const handleAddSymbol = () => {
+  const addSymbol = () => {
     if (newSymbol && !symbols.includes(newSymbol.toUpperCase())) {
       setSymbols([...symbols, newSymbol.toUpperCase()]);
       setNewSymbol('');
     }
   };
 
-  const handleAnalyzeAll = async () => {
+  const removeSymbol = (sym) => {
+    setSymbols(symbols.filter(s => s !== sym));
+    const newResults = { ...results };
+    delete newResults[sym];
+    setResults(newResults);
+  };
+
+  const analyzeSymbol = async (symbol) => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8888/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol })
+      });
+      const data = await response.json();
+      setResults(prev => ({ ...prev, [symbol]: data }));
+    } catch (error) {
+      console.error(`Error analyzing ${symbol}:`, error);
+      setResults(prev => ({
+        ...prev,
+        [symbol]: { error: error.message }
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const analyzeAll = async () => {
     setLoading(true);
     for (const symbol of symbols) {
-      await handleAnalyze(symbol);
+      await analyzeSymbol(symbol);
     }
     setLoading(false);
   };
 
-  return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-      <h1>≡ MAGI System v4.0</h1>
-      
-      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px', maxWidth: '800px' }}>
-        <h2>複数銘柄分析</h2>
+  const renderTechnicalData = (data) => {
+    if (!data || !data.technical) {
+      return <div className="no-data">データ取得中...</div>;
+    }
+
+    const tech = data.technical;
+    return (
+      <div className="technical-section">
+        <h3>📊 テクニカル分析</h3>
         
-        <div style={{ marginBottom: '15px', display: 'flex', gap: '10px' }}>
-          <input 
-            value={newSymbol} 
-            onChange={(e) => setNewSymbol(e.target.value.toUpperCase())} 
-            placeholder="銘柄を追加（例：TSLA）" 
-            style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ddd' }} 
+        <div className="price-info">
+          <div className="info-item">
+            <span className="label">現在価格:</span>
+            <span className="value">${tech.currentPrice}</span>
+          </div>
+          <div className="info-item">
+            <span className="label">データソース:</span>
+            <span className="value">{tech.dataSource}</span>
+          </div>
+        </div>
+
+        {tech.indicators && (
+          <div className="indicators">
+            {/* RSI */}
+            {tech.indicators.rsi && (
+              <div className="indicator">
+                <div className="indicator-name">RSI (14)</div>
+                <div className="indicator-value">
+                  <span className={`rsi-value ${tech.indicators.rsi > 70 ? 'overbought' : tech.indicators.rsi < 30 ? 'oversold' : 'neutral'}`}>
+                    {tech.indicators.rsi}%
+                  </span>
+                </div>
+                <div className="indicator-bar">
+                  <div className="bar-background">
+                    <div 
+                      className="bar-fill" 
+                      style={{ width: `${tech.indicators.rsi}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MACD */}
+            {tech.indicators.macd && (
+              <div className="indicator">
+                <div className="indicator-name">MACD</div>
+                <div className="macd-values">
+                  <div className="macd-item">
+                    <span>Line:</span>
+                    <span className={tech.indicators.macd.line > 0 ? 'positive' : 'negative'}>
+                      {tech.indicators.macd.line}
+                    </span>
+                  </div>
+                  <div className="macd-item">
+                    <span>Signal:</span>
+                    <span className={tech.indicators.macd.signal > 0 ? 'positive' : 'negative'}>
+                      {tech.indicators.macd.signal}
+                    </span>
+                  </div>
+                  <div className="macd-item">
+                    <span>Histogram:</span>
+                    <span className={tech.indicators.macd.histogram > 0 ? 'positive' : 'negative'}>
+                      {tech.indicators.macd.histogram}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bollinger Bands */}
+            {tech.indicators.bollingerBands && (
+              <div className="indicator">
+                <div className="indicator-name">Bollinger Bands</div>
+                <div className="bb-values">
+                  <div className="bb-item">
+                    <span>上限:</span>
+                    <span className="bb-upper">${tech.indicators.bollingerBands.upper}</span>
+                  </div>
+                  <div className="bb-item">
+                    <span>中央:</span>
+                    <span className="bb-middle">${tech.indicators.bollingerBands.middle}</span>
+                  </div>
+                  <div className="bb-item">
+                    <span>下限:</span>
+                    <span className="bb-lower">${tech.indicators.bollingerBands.lower}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* シグナル */}
+        {tech.signals && (
+          <div className="signals">
+            <h4>📈 シグナル</h4>
+            <div className="signal-grid">
+              {tech.signals.rsiSignal && (
+                <div className={`signal-box ${tech.signals.rsiSignal.toLowerCase()}`}>
+                  <span className="signal-label">RSI:</span>
+                  <span className="signal-value">{tech.signals.rsiSignal}</span>
+                </div>
+              )}
+              {tech.signals.macdSignal && (
+                <div className={`signal-box ${tech.signals.macdSignal.toLowerCase()}`}>
+                  <span className="signal-label">MACD:</span>
+                  <span className="signal-value">{tech.signals.macdSignal}</span>
+                </div>
+              )}
+              {tech.signals.bbSignal && (
+                <div className={`signal-box ${tech.signals.bbSignal.toLowerCase()}`}>
+                  <span className="signal-label">BB:</span>
+                  <span className="signal-value">{tech.signals.bbSignal}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>📊 MAGI System v4.0 - テクニカル分析</h1>
+        <p>複数銘柄のリアルタイム株価分析</p>
+      </header>
+
+      <div className="control-panel">
+        <div className="input-group">
+          <input
+            type="text"
+            value={newSymbol}
+            onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
+            placeholder="銘柄コード (例: AAPL, GOOGL)"
+            onKeyPress={(e) => e.key === 'Enter' && addSymbol()}
           />
-          <button 
-            onClick={handleAddSymbol} 
-            style={{ padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>
-            追加
+          <button onClick={addSymbol} className="btn-add">追加</button>
+          <button onClick={analyzeAll} className="btn-analyze" disabled={loading}>
+            {loading ? '分析中...' : '全て分析'}
           </button>
         </div>
 
-        <div style={{ marginBottom: '15px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+        <div className="symbol-list">
           {symbols.map(symbol => (
-            <div key={symbol} style={{ backgroundColor: '#f0f0f0', padding: '10px 15px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div key={symbol} className="symbol-tag">
               <span>{symbol}</span>
               <button 
-                onClick={() => setSymbols(symbols.filter(s => s !== symbol))}
-                style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', fontSize: '18px' }}>
+                onClick={() => removeSymbol(symbol)}
+                className="btn-remove"
+              >
                 ×
               </button>
             </div>
           ))}
         </div>
-
-        <button 
-          onClick={handleAnalyzeAll} 
-          disabled={loading} 
-          style={{ padding: '10px 30px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontSize: '16px' }}>
-          {loading ? '分析中...' : 'すべて分析'}
-        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+      <div className="results-grid">
         {symbols.map(symbol => (
-          <div key={symbol} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <h3>{symbol}</h3>
-            <button 
-              onClick={() => handleAnalyze(symbol)} 
-              disabled={loading}
-              style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', marginBottom: '15px' }}>
-              分析
-            </button>
-
-            {results[symbol] && !results[symbol].error && (
-              <div>
-                <p><strong>企業:</strong> {results[symbol].company}</p>
-                <p><strong>現在価格:</strong> ${results[symbol].financialData?.currentPrice?.toFixed(2) || 'N/A'}</p>
-                <p><strong>推奨:</strong> 
-                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: results[symbol].consensus?.recommendation === 'BUY' ? 'green' : results[symbol].consensus?.recommendation === 'SELL' ? 'red' : 'orange' }}>
-                    {results[symbol].consensus?.recommendation || 'N/A'}
-                  </span>
-                </p>
-                <p><strong>信頼度:</strong> {(results[symbol].consensus?.average_confidence * 100).toFixed(0)}%</p>
-                
-                {results[symbol].aiRecommendations && (
-                  <div style={{ marginTop: '15px', backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '4px' }}>
-                    <p><strong>AI分析:</strong></p>
-                    <ul style={{ marginLeft: '20px', fontSize: '12px' }}>
-                      {results[symbol].aiRecommendations.map((rec, idx) => (
-                        <li key={idx}>{rec.provider}: {rec.action} ({rec.confidence}%)</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {results[symbol]?.error && (
-              <div style={{ backgroundColor: '#ffe6e6', padding: '15px', borderRadius: '4px', color: 'red' }}>
-                エラー: {results[symbol].error}
-              </div>
-            )}
-
-            {!results[symbol] && (
-              <p style={{ color: '#999' }}>分析を実行してください</p>
-            )}
+          <div key={symbol} className="result-card">
+            <div className="card-header">
+              <h2>{symbol}</h2>
+              <button 
+                onClick={() => analyzeSymbol(symbol)}
+                className="btn-refresh"
+                disabled={loading}
+              >
+                🔄 分析
+              </button>
+            </div>
+            <div className="card-body">
+              {results[symbol] ? (
+                renderTechnicalData(results[symbol])
+              ) : (
+                <div className="empty-state">
+                  <p>🔄 分析ボタンをクリックしてください</p>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
