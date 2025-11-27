@@ -1,51 +1,63 @@
 const express = require('express');
 const path = require('path');
-
+const axios = require('axios');
 const app = express();
-app.use(express.json());
 
-// build フォルダから静的ファイルを提供
+const PORT = process.env.PORT || 8080;
+const MAGI_SYS_URL = process.env.MAGI_SYS_URL || 'http://localhost:8081';
+const MAGI_AC_URL = process.env.MAGI_AC_URL || 'http://localhost:8888';
+
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'build')));
 
-// ティッカーデータベース（モック）
-const companies = {
-  AAPL: { name: "Apple Inc.", recommendation: "BUY", confidence: 0.85 },
-  GOOGL: { name: "Alphabet Inc.", recommendation: "BUY", confidence: 0.78 },
-  MSFT: { name: "Microsoft Corporation", recommendation: "HOLD", confidence: 0.72 },
-  AMZN: { name: "Amazon.com Inc.", recommendation: "BUY", confidence: 0.81 },
-  TSLA: { name: "Tesla Inc.", recommendation: "HOLD", confidence: 0.65 },
-  META: { name: "Meta Platforms Inc.", recommendation: "HOLD", confidence: 0.70 },
-  NVDA: { name: "NVIDIA Corporation", recommendation: "BUY", confidence: 0.88 },
-  JPY: { name: "ドル円（JPY）", recommendation: "HOLD", confidence: 0.60 }
-};
-
-// API エンドポイント
-app.post('/api/analyze', (req, res) => {
-  const { symbol } = req.body;
-  const symbolUpper = symbol.toUpperCase();
-  
-  const company = companies[symbolUpper] || {
-    name: `${symbolUpper} (Unknown)`,
-    recommendation: "HOLD",
-    confidence: 0.50
-  };
-  
-  res.json({
-    symbol: symbolUpper,
-    company: company.name,
-    consensus: { 
-      recommendation: company.recommendation,
-      confidence: company.confidence
-    }
-  });
+// magi-ac プロキシ
+app.all('/proxy/ac/*', async (req, res) => {
+  try {
+    const targetPath = req.path.replace('/proxy/ac', '');
+    const url = MAGI_AC_URL + targetPath;
+    console.log(`[Proxy] ${req.method} ${url}`);
+    
+    const response = await axios({
+      method: req.method,
+      url: url,
+      data: req.body,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('[Proxy Error]', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// すべてのルートで index.html を返す
+// magi-sys プロキシ
+app.all('/proxy/sys/*', async (req, res) => {
+  try {
+    const targetPath = req.path.replace('/proxy/sys', '');
+    const url = MAGI_SYS_URL + targetPath;
+    console.log(`[Proxy] ${req.method} ${url}`);
+    
+    const response = await axios({
+      method: req.method,
+      url: url,
+      data: req.body,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('[Proxy Error]', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log('Server running on port ' + PORT);
+  console.log(`✅ MAGI-UI running on port ${PORT}`);
+  console.log(`📡 Proxy: /proxy/ac/* -> ${MAGI_AC_URL}`);
+  console.log(`📡 Proxy: /proxy/sys/* -> ${MAGI_SYS_URL}`);
 });

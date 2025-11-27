@@ -26,8 +26,8 @@ function App() {
   const [docLoading, setDocLoading] = useState(false);
 
   // 設定
-  const [magiSysUrl, setMagiSysUrl] = useState('/proxy/sys');
-  const [magiAcUrl, setMagiAcUrl] = useState('/proxy/ac');
+  const [magiSysUrl, setMagiSysUrl] = useState('http://localhost:8080');
+  const [magiAcUrl, setMagiAcUrl] = useState('http://localhost:8888');
 
   // ページ切り替え
   const navigateTo = (page) => {
@@ -249,17 +249,17 @@ function App() {
                   <div className="error">{stockResults[symbol].error}</div>
                 ) : (
                   <>
-                    <div className={`recommendation ${stockResults[symbol]?.aiConsensus?.consensus?.recommendation?.toLowerCase()}`}>
-                      {stockResults[symbol]?.aiConsensus?.consensus?.recommendation || 'N/A'}
+                    <div className={`recommendation ${stockResults[symbol].recommendation?.toLowerCase()}`}>
+                      {stockResults[symbol].recommendation || 'N/A'}
                     </div>
                     <div className="confidence">
-                      信頼度: {stockResults[symbol]?.aiConsensus?.consensus?.confidence || 0}%
+                      信頼度: {Math.round((stockResults[symbol].confidence || 0) * 100)}%
                     </div>
-                    {stockResults[symbol]?.aiConsensus?.consensus?.votes && (
+                    {stockResults[symbol].votes && (
                       <div className="votes">
-                        BUY: {stockResults[symbol]?.aiConsensus?.consensus?.votes.BUY || 0} / 
-                        HOLD: {stockResults[symbol]?.aiConsensus?.consensus?.votes.HOLD || 0} / 
-                        SELL: {stockResults[symbol]?.aiConsensus?.consensus?.votes.SELL || 0}
+                        BUY: {stockResults[symbol].votes.BUY || 0} / 
+                        HOLD: {stockResults[symbol].votes.HOLD || 0} / 
+                        SELL: {stockResults[symbol].votes.SELL || 0}
                       </div>
                     )}
                   </>
