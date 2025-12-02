@@ -5,6 +5,10 @@ function App() {
   // メニュー状態
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('stock'); // stock, qa, document, settings
+  // 自動売買の状態
+  const [autoTradeResult, setAutoTradeResult] = useState(null);
+  const [autoTradeLoading, setAutoTradeLoading] = useState(false);
+  const [watchSymbols, setWatchSymbols] = useState("AAPL,NVDA,GOOGL,MSFT,TSLA");
 
   // 質問応答の状態
   const [question, setQuestion] = useState('');
@@ -311,6 +315,81 @@ function App() {
     </div>
   );
 
+  // ========== 自動売買ページ ==========
+  const runAutoTrade = async () => {
+    setAutoTradeLoading(true);
+    setAutoTradeResult(null);
+    try {
+      const symbolsArray = watchSymbols.split(",").map(s => s.trim().toUpperCase()).filter(s => s);
+      const response = await fetch(`${magiAcUrl}/api/auto-trade`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ symbols: symbolsArray }) });
+      const data = await response.json();
+      setAutoTradeResult(data);
+    } catch (err) {
+      setAutoTradeResult({ ok: false, error: err.message });
+    }
+    setAutoTradeLoading(false);
+  };
+
+  const renderAutoTradePage = () => (
+    <div className="page-content">
+      <h2>自動売買</h2>
+      <p>5銘柄を4AIで分析し、条件に応じて自動注文します。</p>
+      <div style={{marginBottom: "15px"}}>
+        <label>監視銘柄（カンマ区切り）:</label>
+        <input type="text" value={watchSymbols} onChange={(e) => setWatchSymbols(e.target.value)} style={{width: "100%", padding: "8px", marginTop: "5px", background: "#333", color: "#fff", border: "1px solid #555", borderRadius: "4px"}} />
+      </div>
+      <ul style={{fontSize: "14px", color: "#666", marginBottom: "20px"}}>
+        <li>購入条件: 4AI全員がBUY</li>
+        <li>売却条件: 3AI以上がSELL</li>
+      </ul>
+      <button onClick={runAutoTrade} disabled={autoTradeLoading} className="analyze-btn">
+        {autoTradeLoading ? "分析中..." : "自動売買実行"}
+      </button>
+      {autoTradeResult && (
+        <div className="result-section" style={{marginTop: "20px"}}>
+          {autoTradeResult.ok ? (
+            <>
+              <h3>分析結果</h3>
+              <table style={{width: "100%", borderCollapse: "collapse"}}>
+                <thead>
+                  <tr style={{background: "#333"}}>
+                    <th style={{padding: "8px", border: "1px solid #444"}}>銘柄</th>
+                    <th style={{padding: "8px", border: "1px solid #444"}}>BUY</th>
+                    <th style={{padding: "8px", border: "1px solid #444"}}>HOLD</th>
+                    <th style={{padding: "8px", border: "1px solid #444"}}>SELL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {autoTradeResult.data?.analyzed?.map((item, i) => (
+                    <tr key={i}>
+                      <td style={{padding: "8px", border: "1px solid #444"}}>{item.symbol}</td>
+                      <td style={{padding: "8px", border: "1px solid #444", color: "#4caf50"}}>{item.votes.BUY}</td>
+                      <td style={{padding: "8px", border: "1px solid #444", color: "#ff9800"}}>{item.votes.HOLD}</td>
+                      <td style={{padding: "8px", border: "1px solid #444", color: "#f44336"}}>{item.votes.SELL}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {autoTradeResult.data?.orders?.length > 0 && (
+                <div style={{marginTop: "15px"}}>
+                  <h4>注文実行</h4>
+                  {autoTradeResult.data.orders.map((o, i) => (
+                    <p key={i}>{o.symbol}: {o.side.toUpperCase()}</p>
+                  ))}
+                </div>
+              )}
+              {autoTradeResult.data?.orders?.length === 0 && (
+                <p style={{marginTop: "15px", color: "#888"}}>条件を満たす銘柄がないため、注文は実行されませんでした。</p>
+              )}
+            </>
+          ) : (
+            <p style={{color: "#f44336"}}>エラー: {autoTradeResult.error}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const renderSettingsPage = () => (
     <div className="page settings-page">
       <h2>設定</h2>
@@ -363,6 +442,9 @@ function App() {
           <li className={currentPage === 'document' ? 'active' : ''} onClick={() => navigateTo('document')}>
             文書解析
           </li>
+          <li className={currentPage === 'autotrade' ? 'active' : ''} onClick={() => navigateTo('autotrade')}>
+            自動売買
+          </li>
           <li className={currentPage === 'settings' ? 'active' : ''} onClick={() => navigateTo('settings')}>
             設定
           </li>
@@ -377,6 +459,7 @@ function App() {
         {currentPage === 'qa' && renderQAPage()}
         {currentPage === 'stock' && renderStockPage()}
         {currentPage === 'document' && renderDocumentPage()}
+        {currentPage === 'autotrade' && renderAutoTradePage()}
         {currentPage === 'settings' && renderSettingsPage()}
       </main>
     </div>
